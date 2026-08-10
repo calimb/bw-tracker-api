@@ -774,6 +774,14 @@ def get_calendar(user_id: int, db: Session = Depends(get_db)):
 
     return result
 
+@app.post("/admin/init")
+def init_database(db: Session = Depends(get_db)):
+    """Initialise les tables et données de base."""
+    from init_db import seed_database
+    Base.metadata.create_all(bind=engine)
+    seed_database()
+    return {"message": "Base initialisée"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
