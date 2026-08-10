@@ -798,6 +798,23 @@ def init_database(db: Session = Depends(get_db)):
     seed_database()
     return {"message": "Base initialisée"}
 
+@app.delete("/skills/{skill_id}/progression")
+def delete_progression(skill_id: int, db: Session = Depends(get_db)):
+    """Supprime toute la progression d'un skill."""
+    from models import GoalMovement, GoalSetResult
+
+    movements = db.query(GoalMovement).filter(
+        GoalMovement.skill_id == skill_id
+    ).all()
+
+    for movement in movements:
+        db.query(GoalSetResult).filter(
+            GoalSetResult.goal_movement_id == movement.id
+        ).delete()
+
+    db.commit()
+    return {"message": "Progression supprimée"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
