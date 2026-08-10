@@ -729,6 +729,51 @@ def retest_max(
         "new_prescription": prescription
     }
 
+@app.get("/calendar/{user_id}")
+def get_calendar(user_id: int, db: Session = Depends(get_db)):
+    """Retourne toutes les séances pour le calendrier."""
+    from models import Goal, GoalSession, GoalSetResult
+
+    # Récupère tous les objectifs de l'utilisateur
+    goals = db.query(Goal).filter(Goal.user_id == user_id).all()
+
+    result = []
+    for goal in goals:
+        for session in goal.sessions:
+            exercises = []
+            # Groupe les résultats par mouvement
+            from collections import defaultdict
+            by_movement = defaultdict(list)
+            for r in session.results:
+                by_movement[r.goal_movement_id].append(r)
+
+            for movement_id, results in by_movement.items():
+                movement = next(
+                    m for m in goal.movements
+                    if m.id == movement_id
+                )
+                exercises.append({
+                    "skill_name": movement.skill.name,
+                    "variation": "",
+                    "results": [
+                        {
+                            "set_number": r.set_number,
+                            "value": r.reps_performed,
+                            "is_record": False
+                        }
+                        for r in results
+                    ]
+                })
+
+            result.append({
+                "id": session.id,
+                "date": session.date.isoformat(),
+                "session_type": session.session_type,
+                "exercises": exercises
+            })
+
+    return result
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
