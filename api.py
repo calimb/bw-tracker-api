@@ -372,25 +372,41 @@ def get_me(token: str, db: Session = Depends(get_db)):
 def get_progression(skill_id: int, db: Session = Depends(get_db)):
     """
     Retourne l'évolution des records pour un skill
-    au fil des séances.
+    au fil des séances d'objectifs.
     """
-    exercises = db.query(Exercise).filter(
-        Exercise.skill_id == skill_id
-    ).join(WorkoutSession).order_by(
-        WorkoutSession.date.asc()
+    from models import GoalMovement, GoalSetResult, GoalSession
+
+    # Récupère tous les mouvements liés à ce skill
+    movements = db.query(GoalMovement).filter(
+        GoalMovement.skill_id == skill_id
     ).all()
 
     progression = []
 
-    for exercise in exercises:
-        if not exercise.results:
-            continue
-        best = max(r.value for r in exercise.results)
-        progression.append({
-            "date": exercise.session.date.strftime("%d/%m/%Y"),
-            "variation": exercise.variation,
-            "best": best
-        })
+    for movement in movements:
+        # Récupère toutes les séances liées à ce mouvement
+        results = db.query(GoalSetResult).filter(
+            GoalSetResult.goal_movement_id == movement.id
+        ).join(GoalSession).order_by(
+            GoalSession.date.asc()
+        ).all()
+
+        # Groupe par séance
+        from collections import defaultdict
+        by_session = defaultdict(list)
+        for r in results:
+            by_session[r.session_id].append(r)
+
+        for session_id, session_results in by_session.items():
+            session = db.query(GoalSession).filter(
+                GoalSession.id == session_id
+            ).first()
+            best = max(r.reps_performed for r in session_results)
+            progression.append({
+                "date": session.date.strftime("%d/%m/%Y"),
+                "variation": session.session_type,
+                "best": best
+            })
 
     return progression
 
@@ -400,37 +416,37 @@ def get_weekly(skill_id: int, db: Session = Depends(get_db)):
     Retourne le total des reps/sec par semaine
     pour un skill donné.
     """
-    from datetime import timedelta
+    from models import GoalMovement, GoalSetResult, GoalSession
 
-    exercises = db.query(Exercise).filter(
-        Exercise.skill_id == skill_id
-    ).join(WorkoutSession).order_by(
-        WorkoutSession.date.asc()
+    movements = db.query(GoalMovement).filter(
+        GoalMovement.skill_id == skill_id
     ).all()
 
     weekly = {}
 
-    for exercise in exercises:
-        if not exercise.results:
-            continue
+    for movement in movements:
+        results = db.query(GoalSetResult).filter(
+            GoalSetResult.goal_movement_id == movement.id
+        ).join(GoalSession).order_by(
+            GoalSession.date.asc()
+        ).all()
 
-        date = exercise.session.date
-        # Numéro de semaine ex: "2026-S21"
-        week_key = f"{date.year}-S{date.isocalendar()[1]:02d}"
+        for r in results:
+            session = db.query(GoalSession).filter(
+                GoalSession.id == r.session_id
+            ).first()
+            date = session.date
+            week_key = f"{date.year}-S{date.isocalendar()[1]:02d}"
+            total = r.reps_performed
+            key = f"{week_key}|{session.session_type}"
 
-        variation = exercise.variation
-        total = sum(r.value for r in exercise.results)
-
-        key = f"{week_key}|{variation}"
-
-        if key not in weekly:
-            weekly[key] = {
-                "week": week_key,
-                "variation": variation,
-                "total": 0
-            }
-
-        weekly[key]["total"] += total
+            if key not in weekly:
+                weekly[key] = {
+                    "week": week_key,
+                    "variation": session.session_type,
+                    "total": 0
+                }
+            weekly[key]["total"] += total
 
     return sorted(weekly.values(), key=lambda x: x["week"])
 
