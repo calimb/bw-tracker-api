@@ -716,6 +716,7 @@ def get_calendar(user_id: int, db: Session = Depends(get_db)):
                 "id": session.id,
                 "date": session.date.isoformat(),
                 "session_type": session.session_type,
+                "goal_id": goal.id,
                 "exercises": exercises
             })
 
