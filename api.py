@@ -408,7 +408,9 @@ class SetResultInput(BaseModel):
 
 class GoalSessionInput(BaseModel):
     goal_id: int
-    session_type: str
+    session_type: str = None
+    fatigue: int = None
+    sleep_hours: float = None
     results: List[SetResultInput]
 
 class RetestInput(BaseModel):
