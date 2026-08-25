@@ -265,9 +265,14 @@ class GoalSession(Base):
 
     id           = Column(Integer, primary_key=True, index=True)
     goal_id      = Column(Integer, ForeignKey("goals.id"), nullable=False)
-    session_type = Column(String, nullable=False)   # Force ou Volume
+    session_type = Column(String, nullable=True)
     date         = Column(DateTime, default=datetime.now)
-    status       = Column(String, default="completed")  # completed / abandoned
+    status       = Column(String, default="completed")
+    
+    # Nouveaux champs
+    fatigue      = Column(Integer, nullable=True)   # 1-10
+    sleep_hours  = Column(Float, nullable=True)     # heures de sommeil
+    rest_days    = Column(Integer, nullable=True)   # jours de repos avant
 
     goal     = relationship("Goal", back_populates="sessions")
     results  = relationship(
@@ -286,12 +291,15 @@ class GoalSetResult(Base):
 
     __tablename__ = "goal_set_results"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    session_id      = Column(Integer, ForeignKey("goal_sessions.id"), nullable=False)
+    id               = Column(Integer, primary_key=True, index=True)
+    session_id       = Column(Integer, ForeignKey("goal_sessions.id"), nullable=False)
     goal_movement_id = Column(Integer, ForeignKey("goal_movements.id"), nullable=False)
-    set_number      = Column(Integer, nullable=False)
-    reps_performed  = Column(Integer, nullable=False)
-    rir             = Column(Integer, nullable=False)
+    set_number       = Column(Integer, nullable=False)
+    reps_performed   = Column(Integer, nullable=False)
+    rir              = Column(Integer, nullable=False)
+    
+    # Nouveau champ
+    duration_seconds = Column(Integer, nullable=True)  # durée de la série en secondes
 
-    session      = relationship("GoalSession", back_populates="results")
+    session       = relationship("GoalSession", back_populates="results")
     goal_movement = relationship("GoalMovement")
