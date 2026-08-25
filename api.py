@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
 from datetime import datetime
+from sqlalchemy import text
 
 from database import get_db, engine, Base
 from models import (
@@ -885,6 +886,19 @@ def get_analytics(
         "sessions": sessions_data,
         "weekly": weekly,
     }
+
+@app.post("/admin/migrate")
+def migrate_database(db: Session = Depends(get_db)):
+    """Ajoute les nouvelles colonnes si elles n'existent pas."""
+    try:
+        db.execute(text("ALTER TABLE goal_sessions ADD COLUMN IF NOT EXISTS fatigue INTEGER"))
+        db.execute(text("ALTER TABLE goal_sessions ADD COLUMN IF NOT EXISTS sleep_hours FLOAT"))
+        db.execute(text("ALTER TABLE goal_sessions ADD COLUMN IF NOT EXISTS rest_days INTEGER"))
+        db.execute(text("ALTER TABLE goal_set_results ADD COLUMN IF NOT EXISTS duration_seconds INTEGER"))
+        db.commit()
+        return {"message": "Migration réussie"}
+    except Exception as e:
+        return {"message": f"Erreur : {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
