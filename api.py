@@ -585,36 +585,29 @@ def start_goal_session(
                 goal_movement_id=movement_id,
                 set_number=r.set_number,
                 reps_performed=r.reps_performed,
-                rir=r.rir
+                rir=r.rir,
+                duration_seconds=r.duration_seconds if hasattr(r, 'duration_seconds') else None
             ))
 
-        # Analyser
+        # Vérifier si objectif atteint
         results_dicts = [
             {"reps_performed": r.reps_performed, "rir": r.rir}
             for r in set_results
         ]
 
-        analysis = analyze_session(
-            results=results_dicts,
-            session_type="Standard",
-            target_reps=movement.prescribed_reps,
-            target_sets=movement.prescribed_sets
-        )
-
-        # Ajuster prescription
-        adjustment = adjust_prescription(movement, analysis, db)
-
-        analysis_by_movement[movement_id] = {
-            "skill_name": movement.skill.name,
-            "analysis": analysis,
-            "next_prescription": adjustment
-        }
-
-        # Vérifier si objectif atteint
         if check_goal_reached(movement, results_dicts):
             goal_reached_movements.append(movement.skill.name)
 
+        movement.last_session_date = datetime.now()
+        db.commit()
+
     db.commit()
+
+    return {
+        "session_id": session.id,
+        "analysis": {},
+        "goal_reached": goal_reached_movements
+    }
 
     return {
         "session_id": session.id,
