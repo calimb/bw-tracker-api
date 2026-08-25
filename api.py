@@ -751,6 +751,141 @@ def delete_progression(skill_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Progression supprimée"}
 
+# =====================================================
+# ROUTES — ANALYSE ET GRAPHES
+# =====================================================
+
+@app.get("/goals/{goal_id}/movements/{movement_id}/analytics")
+def get_analytics(
+    goal_id: int,
+    movement_id: int,
+    db: Session = Depends(get_db)
+):
+    """Retourne tous les capteurs et données pour les graphes."""
+    from models import GoalMovement, GoalSession, GoalSetResult
+    from collections import defaultdict
+
+    movement = db.query(GoalMovement).filter(
+        GoalMovement.id == movement_id,
+        GoalMovement.goal_id == goal_id
+    ).first()
+
+    if not movement:
+        raise HTTPException(status_code=404, detail="Mouvement introuvable")
+
+    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+
+    # Récupère toutes les séances de l'objectif triées par date
+    sessions = db.query(GoalSession).filter(
+        GoalSession.goal_id == goal_id
+    ).order_by(GoalSession.date.asc()).all()
+
+    # Date de la première séance (pour calcul semaine personnalisée)
+    first_session_date = sessions[0].date if sessions else None
+
+    sessions_data = []
+    weekly_data = defaultdict(lambda: {
+        "total_reps": 0,
+        "max_reps": 0,
+        "all_rir": [],
+    })
+
+    prev_date = None
+
+    for session in sessions:
+        # Résultats de ce mouvement dans cette séance
+        results = db.query(GoalSetResult).filter(
+            GoalSetResult.session_id == session.id,
+            GoalSetResult.goal_movement_id == movement_id
+        ).order_by(GoalSetResult.set_number.asc()).all()
+
+        if not results:
+            continue
+
+        # Calcul semaine personnalisée
+        if first_session_date:
+            days_from_start = (session.date - first_session_date).days
+            # Lundi comme début de semaine
+            first_weekday = first_session_date.weekday()
+            adjusted_days = days_from_start + first_weekday
+            custom_week = (adjusted_days // 7) + 1
+        else:
+            custom_week = 1
+
+        # Capteurs
+        reps_list = [r.reps_performed for r in results]
+        rir_list = [r.rir for r in results]
+        durations = [r.duration_seconds for r in results if r.duration_seconds]
+
+        max_reps = max(reps_list)
+        total_reps = sum(reps_list)
+        avg_reps = round(total_reps / len(reps_list), 1)
+        avg_rir = round(sum(rir_list) / len(rir_list), 1)
+        first_reps = reps_list[0]
+        last_reps = reps_list[-1]
+        first_rir = rir_list[0]
+        last_rir = rir_list[-1]
+        nb_sets = len(results)
+        diff_first_last = first_reps - last_reps
+        avg_rest = round(sum(durations) / len(durations), 1) if durations else None
+
+        # Jours de repos
+        rest_days = (session.date - prev_date).days - 1 if prev_date else 0
+        prev_date = session.date
+
+        # Données hebdomadaires
+        week_key = f"S{custom_week}"
+        weekly_data[week_key]["total_reps"] += total_reps
+        weekly_data[week_key]["max_reps"] = max(
+            weekly_data[week_key]["max_reps"], max_reps
+        )
+        weekly_data[week_key]["all_rir"].extend(rir_list)
+
+        sessions_data.append({
+            "date": session.date.strftime("%d/%m/%Y"),
+            "week": custom_week,
+            "session_type": session.session_type,
+            # Capteurs
+            "rest_days": rest_days,
+            "max_reps": max_reps,
+            "total_reps": total_reps,
+            "avg_rir": avg_rir,
+            "first_reps": first_reps,
+            "last_reps": last_reps,
+            "avg_reps": avg_reps,
+            "first_rir": first_rir,
+            "last_rir": last_rir,
+            "nb_sets": nb_sets,
+            "diff_first_last": diff_first_last,
+            "avg_rest_seconds": avg_rest,
+            "fatigue": session.fatigue,
+            "sleep_hours": session.sleep_hours,
+        })
+
+    # Données hebdomadaires finales
+    weekly = []
+    for week_key, data in sorted(weekly_data.items()):
+        avg_rir_hebdo = round(
+            sum(data["all_rir"]) / len(data["all_rir"]), 1
+        ) if data["all_rir"] else 0
+        efficacite = round(
+            (data["max_reps"] / avg_rir_hebdo) * 100, 1
+        ) if avg_rir_hebdo > 0 else 0
+        weekly.append({
+            "week": week_key,
+            "total_reps": data["total_reps"],
+            "max_reps": data["max_reps"],
+            "avg_rir": avg_rir_hebdo,
+            "efficacite": efficacite,
+        })
+
+    return {
+        "skill_name": movement.skill.name,
+        "goal_reps": movement.goal_reps,
+        "sessions": sessions_data,
+        "weekly": weekly,
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
