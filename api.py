@@ -596,7 +596,7 @@ def start_goal_session(
 
         analysis = analyze_session(
             results=results_dicts,
-            session_type=body.session_type,
+            session_type="Standard",
             target_reps=movement.prescribed_reps,
             target_sets=movement.prescribed_sets
         )
