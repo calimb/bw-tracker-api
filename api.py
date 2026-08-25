@@ -409,7 +409,6 @@ class SetResultInput(BaseModel):
 
 class GoalSessionInput(BaseModel):
     goal_id: int
-    session_type: str = None
     fatigue: int = None
     sleep_hours: float = None
     results: List[SetResultInput]
@@ -553,8 +552,10 @@ def start_goal_session(
     # Création de la séance
     session = GoalSession(
         goal_id=goal_id,
-        session_type=body.session_type,
-        date=datetime.now()
+        session_type="Standard",
+        date=datetime.now(),
+        fatigue=body.fatigue,
+        sleep_hours=body.sleep_hours,
     )
     db.add(session)
     db.flush()
