@@ -758,7 +758,7 @@ def get_analytics(
     db: Session = Depends(get_db)
 ):
     """Retourne tous les capteurs et données pour les graphes."""
-    from models import GoalMovement, GoalSession, GoalSetResult
+    from models import Goal, GoalMovement, GoalSession, GoalSetResult
     from collections import defaultdict
 
     movement = db.query(GoalMovement).filter(
