@@ -908,6 +908,21 @@ def delete_goal_session(session_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Séance supprimée"}
 
+@app.delete("/skills/unused")
+def delete_unused_skills(db: Session = Depends(get_db)):
+    """Supprime tous les skills non liés à un objectif."""
+    from models import GoalMovement
+    used_skill_ids = [
+        m.skill_id for m in db.query(GoalMovement).all()
+    ]
+    skills_to_delete = db.query(Skill).filter(
+        ~Skill.id.in_(used_skill_ids)
+    ).all()
+    for skill in skills_to_delete:
+        db.delete(skill)
+    db.commit()
+    return {"message": f"{len(skills_to_delete)} skills supprimés"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
