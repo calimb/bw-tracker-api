@@ -923,6 +923,32 @@ def delete_unused_skills(db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"{len(skills_to_delete)} skills supprimés"}
 
+@app.get("/users/{user_id}/levels")
+def get_user_levels(user_id: int, db: Session = Depends(get_db)):
+    """Retourne les niveaux actuels de l'utilisateur depuis ses objectifs."""
+    from models import Goal, GoalMovement
+
+    goals = db.query(Goal).filter(
+        Goal.user_id == user_id
+    ).all()
+
+    levels = {}
+    for goal in goals:
+        for movement in goal.movements:
+            skill_id = movement.skill_id
+            if skill_id not in levels:
+                levels[skill_id] = {
+                    "skill_name": movement.skill.name,
+                    "skill_type": movement.skill.skill_type,
+                    "current_max_reps": movement.current_max_reps,
+                }
+            else:
+                # Garder le max le plus élevé si même skill dans plusieurs objectifs
+                if movement.current_max_reps > levels[skill_id]["current_max_reps"]:
+                    levels[skill_id]["current_max_reps"] = movement.current_max_reps
+
+    return list(levels.values())
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
