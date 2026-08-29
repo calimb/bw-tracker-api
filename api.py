@@ -588,7 +588,11 @@ def start_goal_session(
                 rir=r.rir,
                 duration_seconds=r.duration_seconds if hasattr(r, 'duration_seconds') else None
             ))
-
+        # Mettre à jour le max si record battu
+        best = max(r.reps_performed for r in set_results)
+        if best > movement.current_max_reps:
+            movement.current_max_reps = best
+            
         # Vérifier si objectif atteint
         results_dicts = [
             {"reps_performed": r.reps_performed, "rir": r.rir}
