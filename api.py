@@ -895,6 +895,19 @@ def migrate_database(db: Session = Depends(get_db)):
     except Exception as e:
         return {"message": f"Erreur : {str(e)}"}
 
+@app.delete("/goal_sessions/{session_id}")
+def delete_goal_session(session_id: int, db: Session = Depends(get_db)):
+    """Supprime une séance d'objectif."""
+    from models import GoalSession
+    session = db.query(GoalSession).filter(
+        GoalSession.id == session_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Séance introuvable")
+    db.delete(session)
+    db.commit()
+    return {"message": "Séance supprimée"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
