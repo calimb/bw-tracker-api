@@ -980,7 +980,8 @@ def admin_get_user_goals(
         raise HTTPException(status_code=403, detail="Accès refusé")
 
     goals = db.query(Goal).filter(
-        Goal.user_id == target_user_id
+        Goal.user_id == target_user_id,
+        Goal.status != "deleted"
     ).all()
 
     result = []
