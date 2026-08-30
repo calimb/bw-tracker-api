@@ -953,6 +953,95 @@ def get_user_levels(user_id: int, db: Session = Depends(get_db)):
 
     return list(levels.values())
 
+# =====================================================
+# ROUTES — ADMIN
+# =====================================================
+
+ADMIN_USER_ID = 1  # votre user_id
+
+@app.get("/admin/users")
+def admin_get_users(user_id: int, db: Session = Depends(get_db)):
+    """Liste tous les utilisateurs — accès admin uniquement."""
+    if user_id != ADMIN_USER_ID:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    users = db.query(User).all()
+    return [{"id": u.id, "username": u.username} for u in users]
+
+
+@app.get("/admin/users/{target_user_id}/goals")
+def admin_get_user_goals(
+    target_user_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Retourne les objectifs d'un utilisateur — accès admin uniquement."""
+    from models import Goal, GoalMovement
+    if user_id != ADMIN_USER_ID:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+
+    goals = db.query(Goal).filter(
+        Goal.user_id == target_user_id
+    ).all()
+
+    result = []
+    for goal in goals:
+        movements = []
+        for m in goal.movements:
+            movements.append({
+                "id": m.id,
+                "skill_id": m.skill_id,
+                "skill_name": m.skill.name,
+                "goal_reps": m.goal_reps,
+                "current_max_reps": m.current_max_reps,
+                "next_session_type": m.next_session_type,
+                "prescribed_reps": m.prescribed_reps,
+                "prescribed_sets": m.prescribed_sets,
+                "days_since_last_session": (
+                    datetime.now() - m.last_session_date
+                ).days if m.last_session_date else None,
+            })
+        result.append({
+            "id": goal.id,
+            "name": goal.name,
+            "status": goal.status,
+            "created_at": goal.created_at,
+            "movements": movements,
+        })
+
+    return result
+
+
+@app.get("/admin/users/{target_user_id}/levels")
+def admin_get_user_levels(
+    target_user_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Retourne les niveaux d'un utilisateur — accès admin uniquement."""
+    from models import Goal, GoalMovement
+    if user_id != ADMIN_USER_ID:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+
+    goals = db.query(Goal).filter(
+        Goal.user_id == target_user_id
+    ).all()
+
+    levels = {}
+    for goal in goals:
+        for movement in goal.movements:
+            skill_id = movement.skill_id
+            if skill_id not in levels:
+                levels[skill_id] = {
+                    "skill_name": movement.skill.name,
+                    "skill_type": movement.skill.skill_type,
+                    "current_max_reps": movement.current_max_reps,
+                }
+            else:
+                if movement.current_max_reps > levels[skill_id]["current_max_reps"]:
+                    levels[skill_id]["current_max_reps"] = movement.current_max_reps
+
+    return list(levels.values())
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
