@@ -129,6 +129,11 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+    faqs = relationship(
+        "FAQ",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 # =====================================================
 # MODÈLE : Session
 # Correspond à votre classe session.py
@@ -303,3 +308,37 @@ class GoalSetResult(Base):
 
     session       = relationship("GoalSession", back_populates="results")
     goal_movement = relationship("GoalMovement")
+
+# =====================================================
+# MODÈLE : FAQ
+# =====================================================
+
+class FAQ(Base):
+
+    __tablename__ = "faqs"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
+    category     = Column(String, nullable=False)  # thématique
+    faq_type     = Column(String, nullable=False)  # "app" ou "sport"
+    question     = Column(String, nullable=False)
+    answer       = Column(String, nullable=True)   # réponse admin
+    status       = Column(String, default="pending")  # pending/published
+    votes        = Column(Integer, default=0)
+    created_at   = Column(DateTime, default=datetime.now)
+    published_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="faqs")
+
+
+# =====================================================
+# MODÈLE : FAQVote
+# =====================================================
+
+class FAQVote(Base):
+
+    __tablename__ = "faq_votes"
+
+    id      = Column(Integer, primary_key=True, index=True)
+    faq_id  = Column(Integer, ForeignKey("faqs.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
