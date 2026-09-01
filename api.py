@@ -1043,6 +1043,150 @@ def admin_get_user_levels(
 
     return list(levels.values())
 
+# =====================================================
+# SCHÉMAS — FAQ
+# =====================================================
+
+class FAQCreate(BaseModel):
+    user_id: int
+    category: str
+    faq_type: str  # "app" ou "sport"
+    question: str
+
+class FAQAnswer(BaseModel):
+    answer: str
+    publish: bool = True
+
+# =====================================================
+# ROUTES — FAQ
+# =====================================================
+
+@app.get("/faqs")
+def get_published_faqs(db: Session = Depends(get_db)):
+    """Retourne toutes les FAQs publiées classées par thématique."""
+    from models import FAQ
+    faqs = db.query(FAQ).filter(
+        FAQ.status == "published"
+    ).order_by(FAQ.category, FAQ.votes.desc()).all()
+
+    result = {}
+    for faq in faqs:
+        if faq.category not in result:
+            result[faq.category] = []
+        result[faq.category].append({
+            "id": faq.id,
+            "question": faq.question,
+            "answer": faq.answer,
+            "faq_type": faq.faq_type,
+            "votes": faq.votes,
+            "category": faq.category,
+        })
+    return result
+
+
+@app.post("/faqs")
+def create_faq(body: FAQCreate, db: Session = Depends(get_db)):
+    """Soumet une nouvelle question."""
+    from models import FAQ
+    faq = FAQ(
+        user_id=body.user_id,
+        category=body.category,
+        faq_type=body.faq_type,
+        question=body.question,
+        status="pending"
+    )
+    db.add(faq)
+    db.commit()
+    db.refresh(faq)
+    return {"message": "Question soumise", "id": faq.id}
+
+
+@app.post("/faqs/{faq_id}/vote")
+def vote_faq(faq_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Vote pour une FAQ — un vote par utilisateur."""
+    from models import FAQ, FAQVote
+    existing = db.query(FAQVote).filter(
+        FAQVote.faq_id == faq_id,
+        FAQVote.user_id == user_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Déjà voté")
+    db.add(FAQVote(faq_id=faq_id, user_id=user_id))
+    faq = db.query(FAQ).filter(FAQ.id == faq_id).first()
+    if faq:
+        faq.votes += 1
+    db.commit()
+    return {"message": "Vote enregistré"}
+
+
+# =====================================================
+# ROUTES — ADMIN FAQ
+# =====================================================
+
+@app.get("/admin/faqs")
+def admin_get_faqs(user_id: int, db: Session = Depends(get_db)):
+    """Retourne toutes les FAQs en attente — admin uniquement."""
+    from models import FAQ
+    if user_id != ADMIN_USER_ID:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    faqs = db.query(FAQ).order_by(
+        FAQ.status, FAQ.votes.desc()
+    ).all()
+    return [
+        {
+            "id": f.id,
+            "category": f.category,
+            "faq_type": f.faq_type,
+            "question": f.question,
+            "answer": f.answer,
+            "status": f.status,
+            "votes": f.votes,
+            "username": f.user.username,
+            "created_at": f.created_at,
+        }
+        for f in faqs
+    ]
+
+
+@app.patch("/admin/faqs/{faq_id}")
+def admin_answer_faq(
+    faq_id: int,
+    user_id: int,
+    body: FAQAnswer,
+    db: Session = Depends(get_db)
+):
+    """Répond à une FAQ et la publie — admin uniquement."""
+    from models import FAQ
+    if user_id != ADMIN_USER_ID:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    faq = db.query(FAQ).filter(FAQ.id == faq_id).first()
+    if not faq:
+        raise HTTPException(status_code=404, detail="FAQ introuvable")
+    faq.answer = body.answer
+    if body.publish:
+        faq.status = "published"
+        faq.published_at = datetime.now()
+    db.commit()
+    return {"message": "FAQ mise à jour"}
+
+
+@app.delete("/admin/faqs/{faq_id}")
+def admin_delete_faq(
+    faq_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Supprime une FAQ — admin uniquement."""
+    from models import FAQ
+    if user_id != ADMIN_USER_ID:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    faq = db.query(FAQ).filter(FAQ.id == faq_id).first()
+    if not faq:
+        raise HTTPException(status_code=404, detail="FAQ introuvable")
+    db.delete(faq)
+    db.commit()
+    return {"message": "FAQ supprimée"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
