@@ -411,6 +411,7 @@ class GoalSessionInput(BaseModel):
     goal_id: int
     fatigue: int = None
     sleep_hours: float = None
+    session_date: str = None
     results: List[SetResultInput]
 
 class RetestInput(BaseModel):
