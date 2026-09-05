@@ -543,7 +543,7 @@ def start_goal_session(
 ):
     """Enregistre une séance et analyse les résultats."""
     from models import Goal, GoalMovement, GoalSession, GoalSetResult
-    from core import analyze_session, adjust_prescription, check_goal_reached
+    from core import check_goal_reached
 
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
     if not goal:
@@ -553,14 +553,13 @@ def start_goal_session(
     session = GoalSession(
         goal_id=goal_id,
         session_type="Standard",
-        date=datetime.now(),
+        date=datetime.fromisoformat(body.session_date) if body.session_date else datetime.now(),
         fatigue=body.fatigue,
         sleep_hours=body.sleep_hours,
     )
     db.add(session)
     db.flush()
 
-    analysis_by_movement = {}
     goal_reached_movements = []
 
     # Grouper résultats par mouvement
@@ -588,11 +587,12 @@ def start_goal_session(
                 rir=r.rir,
                 duration_seconds=r.duration_seconds if hasattr(r, 'duration_seconds') else None
             ))
+
         # Mettre à jour le max si record battu
         best = max(r.reps_performed for r in set_results)
         if best > movement.current_max_reps:
             movement.current_max_reps = best
-            
+
         # Vérifier si objectif atteint
         results_dicts = [
             {"reps_performed": r.reps_performed, "rir": r.rir}
@@ -612,13 +612,6 @@ def start_goal_session(
         "analysis": {},
         "goal_reached": goal_reached_movements
     }
-
-    return {
-        "session_id": session.id,
-        "analysis": analysis_by_movement,
-        "goal_reached": goal_reached_movements
-    }
-
 
 @app.patch("/goals/{goal_id}/status")
 def update_goal_status(
