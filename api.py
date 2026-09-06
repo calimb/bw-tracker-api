@@ -937,6 +937,7 @@ def get_user_levels(user_id: int, db: Session = Depends(get_db)):
             skill_id = movement.skill_id
             if skill_id not in levels:
                 levels[skill_id] = {
+                    "skill_id": skill_id,  # ajoutez cette ligne
                     "skill_name": movement.skill.name,
                     "skill_type": movement.skill.skill_type,
                     "current_max_reps": movement.current_max_reps,
@@ -1028,6 +1029,7 @@ def admin_get_user_levels(
             skill_id = movement.skill_id
             if skill_id not in levels:
                 levels[skill_id] = {
+                    "skill_id": skill_id,  # ajoutez cette ligne
                     "skill_name": movement.skill.name,
                     "skill_type": movement.skill.skill_type,
                     "current_max_reps": movement.current_max_reps,
