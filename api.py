@@ -1182,6 +1182,27 @@ def admin_delete_faq(
     db.commit()
     return {"message": "FAQ supprimée"}
 
+@app.patch("/users/{user_id}/levels/{skill_id}")
+def update_user_level(
+    user_id: int,
+    skill_id: int,
+    value: int,
+    db: Session = Depends(get_db)
+):
+    """Met à jour manuellement le max d'un mouvement."""
+    from models import Goal, GoalMovement
+    goals = db.query(Goal).filter(Goal.user_id == user_id).all()
+    updated = False
+    for goal in goals:
+        for movement in goal.movements:
+            if movement.skill_id == skill_id:
+                movement.current_max_reps = value
+                updated = True
+    if not updated:
+        raise HTTPException(status_code=404, detail="Mouvement introuvable")
+    db.commit()
+    return {"message": "Niveau mis à jour", "value": value}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
