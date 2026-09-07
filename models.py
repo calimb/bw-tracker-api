@@ -278,7 +278,7 @@ class GoalSession(Base):
     fatigue      = Column(Integer, nullable=True)   # 1-10
     sleep_hours  = Column(Float, nullable=True)     # heures de sommeil
     rest_days    = Column(Integer, nullable=True)   # jours de repos avant
-    max_at_session = Column(JSON, nullable=True)  # {movement_id: max_reps}
+    max_at_session = Column(JSON, nullable=True)
 
     goal     = relationship("Goal", back_populates="sessions")
     results  = relationship(
