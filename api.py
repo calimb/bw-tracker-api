@@ -889,6 +889,7 @@ def migrate_database(db: Session = Depends(get_db)):
         db.execute(text("ALTER TABLE goal_sessions ADD COLUMN IF NOT EXISTS sleep_hours FLOAT"))
         db.execute(text("ALTER TABLE goal_sessions ADD COLUMN IF NOT EXISTS rest_days INTEGER"))
         db.execute(text("ALTER TABLE goal_set_results ADD COLUMN IF NOT EXISTS duration_seconds INTEGER"))
+        db.execute(text("ALTER TABLE goal_sessions ADD COLUMN IF NOT EXISTS max_at_session JSONB"))
         db.commit()
         return {"message": "Migration réussie"}
     except Exception as e:
