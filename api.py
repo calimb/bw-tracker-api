@@ -877,6 +877,7 @@ def get_analytics(
     return {
         "skill_name": movement.skill.name,
         "goal_reps": movement.goal_reps,
+        "current_max_reps": movement.current_max_reps,  # ajoutez cette ligne
         "sessions": sessions_data,
         "weekly": weekly,
     }
