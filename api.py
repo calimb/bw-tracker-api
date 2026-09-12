@@ -405,7 +405,7 @@ class SetResultInput(BaseModel):
     goal_movement_id: int
     set_number: int
     reps_performed: int
-    rir: int
+    rir: float = None
     duration_seconds: int = None
 
 class GoalSessionInput(BaseModel):

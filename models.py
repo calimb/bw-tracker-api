@@ -302,7 +302,7 @@ class GoalSetResult(Base):
     goal_movement_id = Column(Integer, ForeignKey("goal_movements.id"), nullable=False)
     set_number       = Column(Integer, nullable=False)
     reps_performed   = Column(Integer, nullable=False)
-    rir              = Column(Integer, nullable=False)
+    rir              = Column(Float, nullable=False)
     
     # Nouveau champ
     duration_seconds = Column(Integer, nullable=True)  # durée de la série en secondes
