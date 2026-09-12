@@ -822,7 +822,7 @@ def get_analytics(
         last_rir = rir_list[-1]
         nb_sets = len(results)
         diff_first_last = first_reps - last_reps
-        avg_rest = round(sum(durations) / len(durations), 1) if durations else None
+        avg_rest = round(sum(durations) / len(durations) / 60, 2) if durations else None
 
         # Jours de repos
         rest_days = (session.date - prev_date).days - 1 if prev_date else 0
