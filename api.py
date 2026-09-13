@@ -759,146 +759,140 @@ def get_analytics(
     db: Session = Depends(get_db)
 ):
     """Retourne tous les capteurs et données pour les graphes."""
-    from models import Goal, GoalMovement, GoalSession, GoalSetResult
-    from collections import defaultdict
+    try:
+        from models import Goal, GoalMovement, GoalSession, GoalSetResult
+        from collections import defaultdict
 
-@app.get("/goals/{goal_id}/movements/{movement_id}/analytics")
-def get_analytics(
-    goal_id: int,
-    movement_id: int,
-    db: Session = Depends(get_db)
-):
-    """Retourne tous les capteurs et données pour les graphes."""
-    from models import GoalMovement, GoalSession, GoalSetResult
-    from collections import defaultdict
+        movement = db.query(GoalMovement).filter(
+            GoalMovement.id == movement_id,
+            GoalMovement.goal_id == goal_id
+        ).first()
 
-    movement = db.query(GoalMovement).filter(
-        GoalMovement.id == movement_id,
-        GoalMovement.goal_id == goal_id
-    ).first()
+        if not movement:
+            raise HTTPException(status_code=404, detail="Mouvement introuvable")
 
-    if not movement:
-        raise HTTPException(status_code=404, detail="Mouvement introuvable")
+        sessions = db.query(GoalSession).filter(
+            GoalSession.goal_id == goal_id
+        ).order_by(GoalSession.date.asc()).all()
 
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+        first_session_date = sessions[0].date if sessions else None
 
-    sessions = db.query(GoalSession).filter(
-        GoalSession.goal_id == goal_id
-    ).order_by(GoalSession.date.asc()).all()
-
-    first_session_date = sessions[0].date if sessions else None
-
-    sessions_data = []
-    weekly_data = defaultdict(lambda: {
-        "total_reps": 0,
-        "max_reps": 0,
-        "all_rir": [],
-        "is_current_week": False,
-    })
-
-    prev_date = None
-
-    for session in sessions:
-        results = db.query(GoalSetResult).filter(
-            GoalSetResult.session_id == session.id,
-            GoalSetResult.goal_movement_id == movement_id
-        ).order_by(GoalSetResult.set_number.asc()).all()
-
-        if not results:
-            continue
-
-        if first_session_date:
-            days_from_start = (session.date - first_session_date).days
-            first_weekday = first_session_date.weekday()
-            adjusted_days = days_from_start + first_weekday
-            custom_week = (adjusted_days // 7) + 1
-        else:
-            custom_week = 1
-
-        reps_list = [r.reps_performed for r in results]
-        rir_list = [r.rir for r in results]
-        durations = [r.duration_seconds for r in results if r.duration_seconds]
-
-        max_reps = max(reps_list)
-        total_reps = sum(reps_list)
-        avg_reps = round(total_reps / len(reps_list), 1)
-        avg_rir = round(sum(rir_list) / len(rir_list), 1)
-        first_reps = reps_list[0]
-        last_reps = reps_list[-1]
-        first_rir = rir_list[0]
-        last_rir = rir_list[-1]
-        nb_sets = len(results)
-        diff_first_last = first_reps - last_reps
-        avg_rest = round(sum(durations) / len(durations) / 60, 2) if durations else None
-
-        rest_days = (session.date - prev_date).days - 1 if prev_date else 0
-        prev_date = session.date
-
-        week_key = f"S{custom_week}"
-
-        # Vérifie si c'est la semaine en cours
-        current_week_num = datetime.now().isocalendar()[1]
-        current_year = datetime.now().year
-        session_week_num = session.date.isocalendar()[1]
-        session_year = session.date.year
-        is_current_week = (session_week_num == current_week_num and 
-                          session_year == current_year)
-
-        weekly_data[week_key]["total_reps"] += total_reps
-        weekly_data[week_key]["max_reps"] = max(
-            weekly_data[week_key]["max_reps"], max_reps
-        )
-        weekly_data[week_key]["all_rir"].extend(rir_list)
-        if is_current_week:
-            weekly_data[week_key]["is_current_week"] = True
-
-        sessions_data.append({
-            "date": session.date.strftime("%d/%m/%Y"),
-            "week": custom_week,
-            "session_type": session.session_type,
-            "rest_days": rest_days,
-            "max_reps": max_reps,
-            "total_reps": total_reps,
-            "avg_rir": avg_rir,
-            "first_reps": first_reps,
-            "last_reps": last_reps,
-            "avg_reps": avg_reps,
-            "first_rir": first_rir,
-            "last_rir": last_rir,
-            "nb_sets": nb_sets,
-            "diff_first_last": diff_first_last,
-            "avg_rest_seconds": avg_rest,
-            "fatigue": session.fatigue,
-            "sleep_hours": session.sleep_hours,
+        sessions_data = []
+        weekly_data = defaultdict(lambda: {
+            "total_reps": 0,
+            "max_reps": 0,
+            "all_rir": [],
+            "is_current_week": False,
         })
 
-    weekly = []
-    for week_key, data in sorted(weekly_data.items()):
-        avg_rir_hebdo = round(
-            sum(data["all_rir"]) / len(data["all_rir"]), 1
-        ) if data["all_rir"] else 0
+        prev_date = None
 
-        is_current_week = data.get("is_current_week", False)
-        efficacite = 0 if is_current_week or avg_rir_hebdo == 0 else round(
-            (data["max_reps"] / avg_rir_hebdo) * 100, 1
-        )
+        for session in sessions:
+            results = db.query(GoalSetResult).filter(
+                GoalSetResult.session_id == session.id,
+                GoalSetResult.goal_movement_id == movement_id
+            ).order_by(GoalSetResult.set_number.asc()).all()
 
-        weekly.append({
-            "week": week_key,
-            "total_reps": data["total_reps"],
-            "max_reps": data["max_reps"],
-            "avg_rir": avg_rir_hebdo,
-            "efficacite": efficacite,
-            "is_current_week": is_current_week,
-        })
+            if not results:
+                continue
 
-    return {
-        "skill_name": movement.skill.name,
-        "goal_reps": movement.goal_reps,
-        "current_max_reps": movement.current_max_reps,
-        "sessions": sessions_data,
-        "weekly": weekly,
-    }
+            if first_session_date:
+                days_from_start = (session.date - first_session_date).days
+                first_weekday = first_session_date.weekday()
+                adjusted_days = days_from_start + first_weekday
+                custom_week = (adjusted_days // 7) + 1
+            else:
+                custom_week = 1
+
+            reps_list = [r.reps_performed for r in results]
+            rir_list = [r.rir for r in results]
+            durations = [r.duration_seconds for r in results if r.duration_seconds]
+
+            max_reps = max(reps_list)
+            total_reps = sum(reps_list)
+            avg_reps = round(total_reps / len(reps_list), 1)
+            avg_rir = round(sum(rir_list) / len(rir_list), 1)
+            first_reps = reps_list[0]
+            last_reps = reps_list[-1]
+            first_rir = rir_list[0]
+            last_rir = rir_list[-1]
+            nb_sets = len(results)
+            diff_first_last = first_reps - last_reps
+            avg_rest = round(sum(durations) / len(durations) / 60, 2) if durations else None
+
+            rest_days = (session.date - prev_date).days - 1 if prev_date else 0
+            prev_date = session.date
+
+            week_key = f"S{custom_week}"
+
+            current_week_num = datetime.now().isocalendar()[1]
+            current_year = datetime.now().year
+            session_week_num = session.date.isocalendar()[1]
+            session_year = session.date.year
+            is_current_week = (session_week_num == current_week_num and
+                              session_year == current_year)
+
+            weekly_data[week_key]["total_reps"] += total_reps
+            weekly_data[week_key]["max_reps"] = max(
+                weekly_data[week_key]["max_reps"], max_reps
+            )
+            weekly_data[week_key]["all_rir"].extend(rir_list)
+            if is_current_week:
+                weekly_data[week_key]["is_current_week"] = True
+
+            sessions_data.append({
+                "date": session.date.strftime("%d/%m/%Y"),
+                "week": custom_week,
+                "session_type": session.session_type,
+                "rest_days": rest_days,
+                "max_reps": max_reps,
+                "total_reps": total_reps,
+                "avg_rir": avg_rir,
+                "first_reps": first_reps,
+                "last_reps": last_reps,
+                "avg_reps": avg_reps,
+                "first_rir": first_rir,
+                "last_rir": last_rir,
+                "nb_sets": nb_sets,
+                "diff_first_last": diff_first_last,
+                "avg_rest_seconds": avg_rest,
+                "fatigue": session.fatigue,
+                "sleep_hours": session.sleep_hours,
+            })
+
+        weekly = []
+        for week_key, data in sorted(weekly_data.items()):
+            avg_rir_hebdo = round(
+                sum(data["all_rir"]) / len(data["all_rir"]), 1
+            ) if data["all_rir"] else 0
+
+            is_current_week = data.get("is_current_week", False)
+            efficacite = 0 if is_current_week or avg_rir_hebdo == 0 else round(
+                (data["max_reps"] / avg_rir_hebdo) * 100, 1
+            )
+
+            weekly.append({
+                "week": week_key,
+                "total_reps": data["total_reps"],
+                "max_reps": data["max_reps"],
+                "avg_rir": avg_rir_hebdo,
+                "efficacite": efficacite,
+                "is_current_week": is_current_week,
+            })
+
+        return {
+            "skill_name": movement.skill.name,
+            "goal_reps": movement.goal_reps,
+            "current_max_reps": movement.current_max_reps,
+            "sessions": sessions_data,
+            "weekly": weekly,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/migrate")
 def migrate_database(db: Session = Depends(get_db)):
