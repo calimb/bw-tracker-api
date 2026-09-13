@@ -867,8 +867,8 @@ def get_analytics(
             ) if data["all_rir"] else 0
 
             is_current_week = data.get("is_current_week", False)
-            efficacite = 0 if is_current_week or avg_rir_hebdo == 0 else round(
-                (data["max_reps"] / avg_rir_hebdo) * 100, 1
+            efficacite = 0 if is_current_week or data["total_reps"] == 0 else round(
+                (data["max_reps"] / data["total_reps"]) * 100, 1
             )
 
             weekly.append({
